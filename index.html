@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kuran Rehberi</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts (Amiri for Arabic text) -->
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Özel Tasarım Dosyamızın stilleri -->
+    <link href="style.css" rel="stylesheet" />
+    <!-- SVG Favicon / İkon Desteği -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+</head>
+<body>
+    <div class="main-container p-4">
+        <!-- Floating Top Nav Dock -->
+        <header class="liquid-glass-card mac-floating-nav d-flex justify-content-center align-items-center py-3 mb-4">
+            <h4 class="mb-0 fw-bolder text-success text-center" style="font-weight: 900;">Kuran Rehberi</h4>
+        </header>
+
+        <!-- Ana Arama ve Seçim Paneli -->
+        <div class="liquid-glass-card p-4 mb-4">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-0">🔍</span>
+                        <input type="text" id="aramaInput" class="form-control border-0 rounded-pill shadow-sm" 
+                               placeholder="Sure ara (Duhâ, Mâide, Bakara...)..." 
+                               style="background: rgba(255,255,255,0.7);"
+                               oninput="sureleriFiltrele()" />
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <select id="sureSelect" class="form-select border-0 rounded-pill shadow-sm" 
+                            style="background: rgba(255,255,255,0.7);" 
+                            onchange="sureSecildi(this.value)">
+                    </select>
+                </div>
+
+                <div class="col-md-2 text-end">
+                    <span id="ayetSayisiBadge" class="badge bg-success rounded-pill px-3 py-2 shadow-sm">-- Ayet</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yükleniyor Göstergesi -->
+        <div id="loadingIndicator" class="text-center py-5 liquid-glass-card" style="display: none;">
+            <div class="spinner-border text-success" role="status"></div>
+            <p class="mt-2 text-muted fw-bold">Yükleniyor...</p>
+        </div>
+
+        <!-- Sure ve Meal Görünümü (Ok Tuşlu Sayfalandırma Alanı) -->
+        <div id="icerikPaneli" class="liquid-glass-card p-4 p-md-5 position-relative" style="display: none;">
+            <!-- Üst Başlık -->
+            <div class="text-center mb-4">
+                <h2 id="sureBaslik" class="fw-bold text-success mb-2"></h2>
+            </div>
+
+            <!-- Sayfalandırma Konteyneri (Oklar ve İçerik) -->
+            <div class="d-flex align-items-center justify-content-between gap-2">
+                
+                <!-- Sol Ok (Önceki Sayfa) -->
+                <button id="solBtn" onclick="sayfaDegistir(-1)" class="btn rounded-circle p-3 shadow-sm" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.5); z-index: 10;">
+                    ◀
+                </button>
+
+                <!-- İçerik Alanı -->
+                <div class="flex-grow-1 text-center">
+                    <!-- Arapça Metin Akışı (Satır Arası Çizgili ve Ferah Düzen) -->
+                    <div id="arapcaAkis" class="mb-4 p-4 rounded-4" style="background: rgba(255,255,255,0.3);">
+                    </div>
+
+                    <hr style="border-color: rgba(0,0,0,0.1);" />
+
+                    <!-- Meal ve Ses Listesi -->
+                    <div id="mealListesi" class="d-flex flex-column gap-3 text-start">
+                    </div>
+                </div>
+
+                <!-- Sağ Ok (Sonraki Sayfa) -->
+                <button id="sagBtn" onclick="sayfaDegistir(1)" class="btn rounded-circle p-3 shadow-sm" style="background: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.5); z-index: 10;">
+                    ▶
+                </button>
+
+            </div>
+
+            <!-- Sayfa Numarası Göstergesi -->
+            <div class="text-center mt-4">
+                <span id="sayfaBilgiBadge" class="badge bg-secondary bg-opacity-25 text-dark rounded-pill px-3 py-2">Sayfa 1 / 1</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Kodları ve API Entegrasyonu -->
+    <script>
+        const surelerListesi = [
+            { number: 1, turkce: "Fâtiha", arapca: "الفاتحة", ayet: 7 },
+            { number: 2, turkce: "Bakara", arapca: "البقرة", ayet: 286 },
+            { number: 3, turkce: "Âl-i İmrân", arapca: "آل عمران", ayet: 200 },
+            { number: 4, turkce: "Nisâ", arapca: "النساء", ayet: 176 },
+            { number: 5, turkce: "Mâide", arapca: "المائدة", ayet: 120 },
+            { number: 6, turkce: "En'âm", arapca: "الأنعام", ayet: 165 },
+            { number: 7, turkce: "A'râf", arapca: "الأعراف", ayet: 206 },
+            { number: 8, turkce: "Enfâl", arapca: "الأنفال", ayet: 75 },
+            { number: 9, turkce: "Tevbe", arapca: "التوبة", ayet: 129 },
+            { number: 10, turkce: "Yûnus", arapca: "يونس", ayet: 109 },
+            { number: 11, turkce: "Hûd", arapca: "هود", ayet: 123 },
+            { number: 12, turkce: "Yûsuf", arapca: "يوسف", ayet: 111 },
+            { number: 13, turkce: "Ra'd", arapca: "الرعد", ayet: 43 },
+            { number: 14, turkce: "İbrâhîm", arapca: "إبراهيم", ayet: 52 },
+            { number: 15, turkce: "Hicr", arapca: "الحجر", ayet: 99 },
+            { number: 16, turkce: "Nahl", arapca: "النحل", ayet: 128 },
+            { number: 17, turkce: "İsrâ", arapca: "الإسراء", ayet: 111 },
+            { number: 18, turkce: "Kehf", arapca: "الكهف", ayet: 110 },
+            { number: 19, turkce: "Meryem", arapca: "مريم", ayet: 98 },
+            { number: 20, turkce: "Tâhâ", arapca: "طه", ayet: 135 },
+            { number: 21, turkce: "Enbiyâ", arapca: "الأنبياء", ayet: 112 },
+            { number: 22, turkce: "Hac", arapca: "الحج", ayet: 78 },
+            { number: 23, turkce: "Mü'minûn", arapca: "المؤمنون", ayet: 118 },
+            { number: 24, turkce: "Nûr", arapca: "النور", ayet: 64 },
+            { number: 25, turkce: "Furkân", arapca: "الفرقان", ayet: 77 },
+            { number: 26, turkce: "Şuerâ", arapca: "الشعراء", ayet: 227 },
+            { number: 27, turkce: "Neml", arapca: "النمل", ayet: 93 },
+            { number: 28, turkce: "Kasas", arapca: "القصص", ayet: 88 },
+            { number: 29, turkce: "Ankebût", arapca: "العنكبوت", ayet: 69 },
+            { number: 30, turkce: "Rûm", arapca: "الروم", ayet: 60 },
+            { number: 31, turkce: "Lokmân", arapca: "لقمان", ayet: 34 },
+            { number: 32, turkce: "Secde", arapca: "السجدة", ayet: 30 },
+            { number: 33, turkce: "Ahzâb", arapca: "الأحزاب", ayet: 73 },
+            { number: 34, turkce: "Sebe'", arapca: "سبإ", ayet: 54 },
+            { number: 35, turkce: "Fâtır", arapca: "فاطر", ayet: 45 },
+            { number: 36, turkce: "Yâsîn", arapca: "يس", ayet: 83 },
+            { number: 37, turkce: "Sâffât", arapca: "الصافات", ayet: 182 },
+            { number: 38, turkce: "Sâd", arapca: "ص", ayet: 88 },
+            { number: 39, turkce: "Zümer", arapca: "الزمر", ayet: 75 },
+            { number: 40, turkce: "Mü'min (Gâfir)", arapca: "غافر", ayet: 85 },
+            { number: 41, turkce: "Fussilet", arapca: "فصلت", ayet: 54 },
+            { number: 42, turkce: "Şûrâ", arapca: "الشورى", ayet: 53 },
+            { number: 43, turkce: "Zuhruf", arapca: "الزخرف", ayet: 89 },
+            { number: 44, turkce: "Duhân", arapca: "الدخان", ayet: 59 },
+            { number: 45, turkce: "Câsiye", arapca: "الجاثية", ayet: 37 },
+            { number: 46, turkce: "Ahkâf", arapca: "الأحقاف", ayet: 35 },
+            { number: 47, turkce: "Muhammed", arapca: "محمد", ayet: 38 },
+            { number: 48, turkce: "Fetih", arapca: "الفتح", ayet: 29 },
+            { number: 49, turkce: "Hucurât", arapca: "الحجرات", ayet: 18 },
+            { number: 50, turkce: "Kâf", arapca: "ق", ayet: 45 },
+            { number: 51, turkce: "Zâriyât", arapca: "الذاريات", ayet: 60 },
+            { number: 52, turkce: "Tûr", arapca: "الطور", ayet: 49 },
+            { number: 53, turkce: "Necm", arapca: "النجم", ayet: 62 },
+            { number: 54, turkce: "Kamer", arapca: "القمر", ayet: 55 },
+            { number: 55, turkce: "Rahmân", arapca: "الرحمن", ayet: 78 },
+            { number: 56, turkce: "Vâkıa", arapca: "الواقعة", ayet: 96 },
+            { number: 57, turkce: "Hadîd", arapca: "الحديد", ayet: 29 },
+            { number: 58, turkce: "Mücâdele", arapca: "المجادلة", ayet: 22 },
+            { number: 59, turkce: "Haşr", arapca: "الحشر", ayet: 24 },
+            { number: 60, turkce: "Mümtehine", arapca: "الممتحنة", ayet: 13 },
+            { number: 61, turkce: "Saff", arapca: "الصف", ayet: 14 },
+            { number: 62, turkce: "Cuma", arapca: "الجمعة", ayet: 11 },
+            { number: 63, turkce: "Münâfikûn", arapca: "المنافقون", ayet: 11 },
+            { number: 64, turkce: "Tegâbün", arapca: "التغابن", ayet: 18 },
+            { number: 65, turkce: "Talâk", arapca: "الطلاق", ayet: 12 },
+            { number: 66, turkce: "Tahrîm", arapca: "التحريم", ayet: 12 },
+            { number: 67, turkce: "Mülk", arapca: "الملك", ayet: 30 },
+            { number: 68, turkce: "Kalem", arapca: "القلم", ayet: 52 },
+            { number: 69, turkce: "Hâkka", arapca: "الحاقة", ayet: 52 },
+            { number: 70, turkce: "Meâric", arapca: "المعارج", ayet: 44 },
+            { number: 71, turkce: "Nûh", arapca: "نوح", ayet: 28 },
+            { number: 72, turkce: "Cin", arapca: "الجن", ayet: 28 },
+            { number: 73, turkce: "Müzzemmil", arapca: "المزمل", ayet: 20 },
+            { number: 74, turkce: "Müddessir", arapca: "المدثر", ayet: 56 },
+            { number: 75, turkce: "Kıyâme", arapca: "القيامة", ayet: 40 },
+            { number: 76, turkce: "İnsân", arapca: "الإنسان", ayet: 31 },
+            { number: 77, turkce: "Mürselât", arapca: "المرسلات", ayet: 50 },
+            { number: 78, turkce: "Nebe'", arapca: "النبإ", ayet: 40 },
+            { number: 79, turkce: "Nâziât", arapca: "النازعات", ayet: 46 },
+            { number: 80, turkce: "Abese", arapca: "عبس", ayet: 42 },
+            { number: 81, turkce: "Tekvîr", arapca: "التكوير", ayet: 29 },
+            { number: 82, turkce: "İnfitâr", arapca: "الإنفطار", ayet: 19 },
+            { number: 83, turkce: "Mutaffifîn", arapca: "المطففين", ayet: 36 },
+            { number: 84, turkce: "İnşikâk", arapca: "الإنشقاق", ayet: 25 },
+            { number: 85, turkce: "Bürûc", arapca: "البروج", ayet: 22 },
+            { number: 86, turkce: "Târık", arapca: "الطارق", ayet: 17 },
+            { number: 87, turkce: "A'lâ", arapca: "الأعلى", ayet: 19 },
+            { number: 88, turkce: "Gâşiye", arapca: "الغاشية", ayet: 26 },
+            { number: 89, turkce: "Fecr", arapca: "الفجر", ayet: 30 },
+            { number: 90, turkce: "Beled", arapca: "البلد", ayet: 20 },
+            { number: 91, turkce: "Şems", arapca: "الشمس", ayet: 15 },
+            { number: 92, turkce: "Leyl", arapca: "الليل", ayet: 21 },
+            { number: 93, turkce: "Duhâ", arapca: "الضحى", ayet: 11 },
+            { number: 94, turkce: "İnşirâh", arapca: "الشرح", ayet: 8 },
+            { number: 95, turkce: "Tîn", arapca: "التين", ayet: 8 },
+            { number: 96, turkce: "Alak", arapca: "العلق", ayet: 19 },
+            { number: 97, turkce: "Kadir", arapca: "القدر", ayet: 5 },
+            { number: 98, turkce: "Beyyine", arapca: "البينة", ayet: 8 },
+            { number: 99, turkce: "Zilzâl", arapca: "الزلزلة", ayet: 8 },
+            { number: 100, turkce: "Âdiyât", arapca: "العاديات", ayet: 11 },
+            { number: 101, turkce: "Kâria", arapca: "القارعة", ayet: 11 },
+            { number: 102, turkce: "Tekâsür", arapca: "التكاثر", ayet: 8 },
+            { number: 103, turkce: "Asr", arapca: "العصر", ayet: 3 },
+            { number: 104, turkce: "Hümeze", arapca: "الهمزة", ayet: 9 },
+            { number: 105, turkce: "Fîl", arapca: "الفيل", ayet: 5 },
+            { number: 106, turkce: "Kureyş", arapca: "قريش", ayet: 4 },
+            { number: 107, turkce: "Mâûn", arapca: "الماعون", ayet: 7 },
+            { number: 108, turkce: "Kevser", arapca: "الكوثر", ayet: 3 },
+            { number: 109, turkce: "Kâfirûn", arapca: "الكافرون", ayet: 6 },
+            { number: 110, turkce: "Nasr", arapca: "النصر", ayet: 3 },
+            { number: 111, turkce: "Tebbet (Mesed)", arapca: "المسد", ayet: 5 },
+            { number: 112, turkce: "İhlâs", arapca: "الإخلاص", ayet: 4 },
+            { number: 113, turkce: "Felak", arapca: "الفلق", ayet: 5 },
+            { number: 114, turkce: "Nâs", arapca: "الناس", ayet: 6 }
+        ];
+
+        let tumArapcaAyetler = [];
+        let tumMealAyetler = [];
+        let tumSesAyetler = [];
+        let aktifSayfa = 0;
+        const ayetSayisiSayfaBasina = 4; // Her sayfada ferah okunması için 4 ayet
+        let aktifSureNo = 1;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            selectGuncelle(surelerListesi);
+            sureYukle(1);
+        });
+
+        function normalize(text) {
+            return text.toLowerCase()
+                .replaceAll("â", "a").replaceAll("î", "i").replaceAll("û", "u")
+                .replaceAll("ç", "c").replaceAll("ğ", "g").replaceAll("ı", "i")
+                .replaceAll("ö", "o").replaceAll("ş", "s").replaceAll("ü", "u")
+                .replaceAll("'", "").replaceAll("-", "").trim();
+        }
+
+        function selectGuncelle(liste) {
+            const select = document.getElementById("sureSelect");
+            select.innerHTML = "";
+            liste.forEach(s => {
+                let opt = document.createElement("option");
+                opt.value = s.number;
+                opt.textContent = `${s.number}. ${s.turkce} (${s.arapca})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function sureleriFiltrele() {
+            let val = document.getElementById("aramaInput").value;
+            let filtrelenmis = surelerListesi.filter(s => 
+                normalize(s.turkce).includes(normalize(val)) || s.number.toString() === val.trim()
+            );
+            selectGuncelle(filtrelenmis);
+            if(filtrelenmis.length > 0) {
+                sureYukle(filtrelenmis[0].number);
+            }
+        }
+
+        function sureSecildi(no) {
+            sureYukle(parseInt(no));
+        }
+
+        async function sureYukle(sureNo) {
+            aktifSureNo = sureNo;
+            document.getElementById("loadingIndicator").style.display = "block";
+            document.getElementById("icerikPaneli").style.display = "none";
+
+            let sureBilgi = surelerListesi.find(s => s.number === sureNo);
+            document.getElementById("sureBaslik").textContent = `${sureBilgi.turkce} Suresi`;
+            document.getElementById("ayetSayisiBadge").textContent = `${sureBilgi.ayet} Ayet`;
+
+            try {
+                // Resmi Uthmani hat standart API sürümü
+                let res = await fetch(`https://api.alquran.cloud/v1/surah/${sureNo}/editions/quran-uthmani,tr.diyanet,ar.alafasy`);
+                let data = await res.json();
+
+                if(data && data.data) {
+                    tumArapcaAyetler = data.data[0].ayahs;
+                    tumMealAyetler = data.data[1].ayahs;
+                    tumSesAyetler = data.data[2].ayahs;
+                    
+                    aktifSayfa = 0; 
+                    sayfayiGoster();
+                }
+            } catch (err) {
+                console.error("Hata:", err);
+            } finally {
+                document.getElementById("loadingIndicator").style.display = "none";
+                document.getElementById("icerikPaneli").style.display = "block";
+            }
+        }
+
+        function sayfaDegistir(yon) {
+            let toplamSayfa = Math.ceil(tumArapcaAyetler.length / ayetSayisiSayfaBasina);
+            aktifSayfa += yon;
+
+            if (aktifSayfa < 0) {
+                aktifSayfa = 0;
+            } else if (aktifSayfa >= toplamSayfa) {
+                aktifSayfa = toplamSayfa - 1;
+            }
+
+            sayfayiGoster();
+        }
+
+        function sayfayiGoster() {
+            let baslangic = aktifSayfa * ayetSayisiSayfaBasina;
+            let bitis = baslangic + ayetSayisiSayfaBasina;
+            let sayfaArapca = tumArapcaAyetler.slice(baslangic, bitis);
+            let sayfaMeal = tumMealAyetler.slice(baslangic, bitis);
+            let sayfaSes = tumSesAyetler.slice(baslangic, bitis);
+
+            let arapcaHTML = "";
+            let mealHTML = "";
+
+            for(let i = 0; i < sayfaArapca.length; i++) {
+                let metin = sayfaArapca[i].text;
+                if(aktifSureNo !== 1 && aktifSureNo !== 9 && (baslangic + i) === 0) {
+                    const bismillah = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+                    if(metin.startsWith(bismillah)) {
+                        metin = metin.substring(bismillah.length).trim();
+                    }
+                }
+
+                let ayetNoRakam = arapcaRakamCevir(sayfaArapca[i].numberInSurah);
+                
+                // Her ayet satırı arasına ince geleneksel çizgi ve ferah satır aralığı eklendi
+                arapcaHTML += `
+                    <div class="py-3 px-2 text-center" style="direction: rtl; font-family: 'Amiri', serif;">
+                        <span class="fs-2 text-dark lh-lg">${metin}</span> 
+                        <span class="quran-number ms-2 me-1">۝${ayetNoRakam}</span>
+                    </div>
+                `;
+                
+                // Son eleman hariç araya çizgi koy
+                if(i < sayfaArapca.length - 1) {
+                    arapcaHTML += `<hr class="my-2" style="border-color: rgba(5, 150, 105, 0.2); width: 80%; margin: 0 auto;" />`;
+                }
+
+                mealHTML += `
+                    <div class="p-3 rounded-3 shadow-sm" style="background: rgba(255,255,255,0.5); border-left: 4px solid #059669;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-success">[${sayfaArapca[i].numberInSurah}. Ayet]</span>
+                            ${sayfaSes[i].audio ? `<audio controls style="height: 35px; max-width: 250px;"><source src="${sayfaSes[i].audio}" type="audio/mpeg"></audio>` : ''}
+                        </div>
+                        <div class="text-dark fs-5">${sayfaMeal[i].text}</div>
+                    </div>
+                `;
+            }
+
+            document.getElementById("arapcaAkis").innerHTML = arapcaHTML;
+            document.getElementById("mealListesi").innerHTML = mealHTML;
+
+            let toplamSayfa = Math.ceil(tumArapcaAyetler.length / ayetSayisiSayfaBasina);
+            document.getElementById("sayfaBilgiBadge").textContent = `Sayfa ${aktifSayfa + 1} / ${toplamSayfa}`;
+            
+            document.getElementById("solBtn").style.opacity = aktifSayfa === 0 ? "0.4" : "1";
+            document.getElementById("sagBtn").style.opacity = aktifSayfa === toplamSayfa - 1 ? "0.4" : "1";
+        }
+
+        function arapcaRakamCevir(num) {
+            const harfler = {'0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩'};
+            return num.toString().split('').map(c => harfler[c] || c).join('');
+        }
+    </script>
+</body>
+</html>
